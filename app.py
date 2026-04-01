@@ -398,49 +398,48 @@ market_data = get_market_data()
 def get_backtest():
     return run_historical_backtest(market_data)
 
-historical_backtest = get_backtest()
-
 
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("**Portfolio**")
-    n_simulations  = st.slider("Simulations",         1_000, 15_000, 1_000, step=1_000)
-    n_years        = st.slider("Horizon (years)",     5,     30,     10,    step=1)
-    initial_wealth = st.number_input("Initial wealth ($)", 10_000, 5_000_000, 100_000, step=10_000)
+    with st.form("simulation_controls"):
+        st.markdown("**Portfolio**")
+        n_simulations  = st.slider("Simulations",         1_000, 15_000, 5_000, step=1_000)
+        n_years        = st.slider("Horizon (years)",     5,     30,     10,    step=1)
+        initial_wealth = st.number_input("Initial wealth ($)", 10_000, 5_000_000, 100_000, step=10_000)
 
-    st.markdown("---")
-    st.markdown("**Loss-Averse investor**")
-    panic_threshold = st.slider("Panic trigger (drawdown)", -0.25, -0.05, -0.10, step=0.01, format="%.0f%%")
-    recovery_days   = st.slider("Recovery days before re-entry", 10, 120, 40, step=5)
+        st.markdown("---")
+        st.markdown("**Loss-Averse investor**")
+        panic_threshold = st.slider("Panic trigger (drawdown)", -0.25, -0.05, -0.10, step=0.01, format="%.0f%%")
+        recovery_days   = st.slider("Recovery days before re-entry", 10, 120, 40, step=5)
 
-    st.markdown("---")
-    st.markdown("**Overconfident investor**")
-    conc_mult  = st.slider("Winner concentration multiplier", 1.5, 4.0, 2.0, step=0.25)
-    trade_freq = st.slider("Re-concentration frequency (days)", 10, 63, 21, step=5)
+        st.markdown("---")
+        st.markdown("**Overconfident investor**")
+        conc_mult  = st.slider("Winner concentration multiplier", 1.5, 4.0, 2.0, step=0.25)
+        trade_freq = st.slider("Re-concentration frequency (days)", 10, 63, 21, step=5)
 
-    st.markdown("---")
-    risk_free = st.slider("Risk-free rate", 0.00, 0.07, 0.04, step=0.005, format="%.1f%%")
-    seed      = st.number_input("Random seed", 0, 9999, 42)
+        st.markdown("---")
+        risk_free = st.slider("Risk-free rate", 0.00, 0.07, 0.04, step=0.005, format="%.1f%%")
+        seed      = st.number_input("Random seed", 0, 9999, 42)
 
-    st.markdown("---")
-    st.markdown("**Model settings**")
-    use_regime = st.toggle(
-        "Regime-switching correlations",
-        value=True,
-        help="When ON: correlations shift between Calm / Normal / Crisis regimes "
-             "(calibrated from historical vol). When OFF: static full-sample correlation.",
-    )
-    st.markdown("---")
-    st.markdown(
-        f"<span style='font-family:Fira Code,monospace;font-size:0.60rem;"
-        f"color:#6E665E;letter-spacing:0.05em'>"
-        f"{market_data.start_date} → {market_data.end_date} &nbsp;·&nbsp; "
-        f"{market_data.n_obs:,} days</span>",
-        unsafe_allow_html=True,
-    )
-    run_btn = st.button("Run Simulation", use_container_width=True, type="primary")
+        st.markdown("---")
+        st.markdown("**Model settings**")
+        use_regime = st.toggle(
+            "Regime-switching correlations",
+            value=True,
+            help="When ON: correlations shift between Calm / Normal / Crisis regimes "
+                 "(calibrated from historical vol). When OFF: static full-sample correlation.",
+        )
+        st.markdown("---")
+        st.markdown(
+            f"<span style='font-family:Fira Code,monospace;font-size:0.60rem;"
+            f"color:#6E665E;letter-spacing:0.05em'>"
+            f"{market_data.start_date} → {market_data.end_date} &nbsp;·&nbsp; "
+            f"{market_data.n_obs:,} days</span>",
+            unsafe_allow_html=True,
+        )
+        run_btn = st.form_submit_button("Run Simulation")
 
 
 # ---------------------------------------------------------------------------
@@ -565,7 +564,7 @@ def run_simulation(n_sim, n_yrs, W0, panic_thr, rec_days, conc, tfreq, rf, seed_
     return results, m_list, config, paths["daily_returns"], paths["regimes"]
 
 
-if "results" not in st.session_state or run_btn:
+if run_btn:
     with st.spinner("Running simulation…"):
         results, m_list, config, daily_returns, sim_regimes = run_simulation(
             n_simulations, n_years, initial_wealth,
@@ -579,12 +578,15 @@ if "results" not in st.session_state or run_btn:
         "config": config, "daily_returns": daily_returns,
         "sim_regimes": sim_regimes,
     })
-else:
+elif "results" in st.session_state:
     results       = st.session_state["results"]
     m_list        = st.session_state["m_list"]
     config        = st.session_state["config"]
     daily_returns = st.session_state["daily_returns"]
     sim_regimes   = st.session_state["sim_regimes"]
+else:
+    st.info("Adjust the inputs in the sidebar, then click Run Simulation to generate the dashboard.")
+    st.stop()
 
 
 # ---------------------------------------------------------------------------
@@ -731,6 +733,7 @@ with tab7:
     st.caption("KS p-value > 0.05 indicates acceptable fit.")
 
 with tab8:
+    historical_backtest = get_backtest()
     st.markdown(
         '<div style="font-family:\'Cormorant SC\',serif;font-size:1.4rem;font-weight:500;'
         'color:#DDD7CB;margin-bottom:0.3rem">Historical Backtest</div>'
