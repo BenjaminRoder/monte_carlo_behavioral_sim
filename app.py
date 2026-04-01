@@ -406,7 +406,7 @@ historical_backtest = get_backtest()
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.markdown("**Portfolio**")
-    n_simulations  = st.slider("Simulations",         1_000, 15_000, 5_000, step=1_000)
+    n_simulations  = st.slider("Simulations",         1_000, 15_000, 1_000, step=1_000)
     n_years        = st.slider("Horizon (years)",     5,     30,     10,    step=1)
     initial_wealth = st.number_input("Initial wealth ($)", 10_000, 5_000_000, 100_000, step=10_000)
 
