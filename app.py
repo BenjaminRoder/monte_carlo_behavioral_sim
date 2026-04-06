@@ -405,22 +405,32 @@ def get_backtest():
 with st.sidebar:
     with st.form("simulation_controls"):
         st.markdown("**Portfolio**")
-        n_simulations  = st.slider("Simulations",         1_000, 15_000, 5_000, step=1_000)
-        n_years        = st.slider("Horizon (years)",     5,     30,     10,    step=1)
-        initial_wealth = st.number_input("Initial wealth ($)", 10_000, 5_000_000, 100_000, step=10_000)
+        n_simulations  = st.slider("Simulations",         1_000, 15_000, 5_000, step=1_000,
+                                   help="How many independent portfolio paths to simulate. More = smoother distributions but slower. 5,000 is a good balance.")
+        n_years        = st.slider("Horizon (years)",     5,     30,     10,    step=1,
+                                   help="Investment horizon in years. Longer horizons amplify the compounding difference between archetypes.")
+        initial_wealth = st.number_input("Initial wealth ($)", 10_000, 5_000_000, 100_000, step=10_000,
+                                         help="Starting portfolio value in dollars. All metrics scale proportionally.")
 
         st.markdown("---")
         st.markdown("**Loss-Averse investor**")
-        panic_threshold = st.slider("Panic trigger (drawdown)", -0.25, -0.05, -0.10, step=0.01, format="%.0f%%")
-        recovery_days   = st.slider("Recovery days before re-entry", 10, 120, 40, step=5)
+        panic_pct       = st.slider("Panic trigger (drawdown)", -25, -5, -10, step=1, format="%d%%",
+                                    help="The drawdown level at which the Loss-Averse investor begins to panic-sell into bonds. At exactly this drawdown, panic probability = 50% (logistic curve). E.g. -10% means a 10% drop from peak triggers ~50% chance of de-risking.")
+        panic_threshold = panic_pct / 100.0
+        recovery_days   = st.slider("Recovery days before re-entry", 10, 120, 40, step=5,
+                                    help="After a panic, how many consecutive up-days the Loss-Averse investor needs to see before gradually re-entering equities.")
 
         st.markdown("---")
         st.markdown("**Overconfident investor**")
-        conc_mult  = st.slider("Winner concentration multiplier", 1.5, 4.0, 2.0, step=0.25)
-        trade_freq = st.slider("Re-concentration frequency (days)", 10, 63, 21, step=5)
+        conc_mult  = st.slider("Winner concentration multiplier", 1.5, 4.0, 2.0, step=0.25,
+                               help="How aggressively the Overconfident investor over-weights the recent best-performing asset. 2.0x means double the normal allocation to the winner.")
+        trade_freq = st.slider("Re-concentration frequency (days)", 10, 63, 21, step=5,
+                               help="How often (in trading days) the Overconfident investor re-evaluates and re-concentrates. More frequent = more transaction costs.")
 
         st.markdown("---")
-        risk_free = st.slider("Risk-free rate", 0.00, 0.07, 0.04, step=0.005, format="%.1f%%")
+        risk_free_pct = st.slider("Risk-free rate", 0, 7, 4, step=1, format="%d%%",
+                                  help="Annual risk-free rate used to compute Sharpe ratio. Approximate with the current 3-month T-bill rate.")
+        risk_free     = risk_free_pct / 100.0
         seed      = st.number_input("Random seed", 0, 9999, 42)
 
         st.markdown("---")
@@ -481,6 +491,50 @@ with c3:
         '&nbsp;<span style="font-size:0.78rem;color:#6E665E">Over-concentrates on winners</span>',
         unsafe_allow_html=True,
     )
+
+
+# ---------------------------------------------------------------------------
+# First-run welcome banner
+# ---------------------------------------------------------------------------
+if "results" not in st.session_state and not st.session_state.get("onboarding_seen", False):
+    st.markdown("""
+<div style="
+    background: var(--bg-raised, #131319);
+    border: 1px solid var(--bd-gold, rgba(200,150,12,0.38));
+    border-left: 3px solid var(--gold, #C8960C);
+    border-radius: 4px;
+    padding: 1.1rem 1.4rem;
+    margin: 1.2rem 0 0.6rem 0;
+">
+  <div style="
+      font-family: 'Fira Code', monospace;
+      font-size: 0.72rem;
+      color: var(--gold, #C8960C);
+      letter-spacing: 0.08em;
+      margin-bottom: 0.65rem;
+  ">◆ &nbsp;GETTING STARTED</div>
+  <div style="display: flex; gap: 2.4rem; flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 160px;">
+      <span style="font-family:'Fira Code',monospace; font-size:0.65rem; color:var(--gold,#C8960C);">STEP 1</span><br>
+      <span style="font-size:0.82rem; color:var(--text-mid,#6E665E);">
+        Adjust the sliders in the left sidebar — set your number of simulations, investment horizon, and starting wealth.
+      </span>
+    </div>
+    <div style="flex: 1; min-width: 160px;">
+      <span style="font-family:'Fira Code',monospace; font-size:0.65rem; color:var(--gold,#C8960C);">STEP 2</span><br>
+      <span style="font-size:0.82rem; color:var(--text-mid,#6E665E);">
+        Tune the behavioral parameters: the <em>panic trigger</em> controls when the Loss-Averse investor sells; the <em>concentration multiplier</em> controls how boldly the Overconfident investor bets on recent winners.
+      </span>
+    </div>
+    <div style="flex: 1; min-width: 160px;">
+      <span style="font-family:'Fira Code',monospace; font-size:0.65rem; color:var(--gold,#C8960C);">STEP 3</span><br>
+      <span style="font-size:0.82rem; color:var(--text-mid,#6E665E);">
+        Click <strong style="color:var(--text-hi,#DDD7CB);">Run Simulation</strong> at the bottom of the sidebar to generate the dashboard.
+      </span>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
@@ -577,6 +631,7 @@ if run_btn:
         "results": results, "m_list": m_list,
         "config": config, "daily_returns": daily_returns,
         "sim_regimes": sim_regimes,
+        "onboarding_seen": True,
     })
 elif "results" in st.session_state:
     results       = st.session_state["results"]
@@ -630,6 +685,64 @@ for i, m in enumerate(m_list):
 st.markdown(_section("Analysis"), unsafe_allow_html=True)
 
 chart_cfg = {"displayModeBar": False}
+
+# ---------------------------------------------------------------------------
+# Key concepts expander
+# ---------------------------------------------------------------------------
+with st.expander("◆ Key concepts & glossary"):
+    left, right = st.columns(2)
+
+    _term_style = (
+        "font-family:'Cormorant SC',serif; font-size:0.78rem; font-weight:600; "
+        "color:#C8960C; letter-spacing:0.09em; text-transform:uppercase; "
+        "margin-bottom:0.15rem; display:block;"
+    )
+    _def_style = (
+        "font-family:'Instrument Sans',sans-serif; font-size:0.83rem; "
+        "color:#6E665E; line-height:1.55; margin-bottom:1.1rem; display:block;"
+    )
+
+    with left:
+        st.markdown(f"""
+<span style="{_term_style}">Loss Aversion</span>
+<span style="{_def_style}">
+Based on Kahneman &amp; Tversky (1979). Losses feel roughly twice as painful as
+equivalent gains feel good. In this model, the Loss-Averse investor panic-sells
+into bonds when their portfolio drops past the panic trigger threshold, then waits
+for a recovery period before re-entering — locking in losses at the worst time.
+</span>
+
+<span style="{_term_style}">Panic Trigger</span>
+<span style="{_def_style}">
+The drawdown level at which panic-selling begins. Implemented as a logistic
+probability curve — not a hard threshold — so the investor gradually de-risks as
+the drawdown deepens, with 50% chance of full de-risking at the trigger level.
+</span>
+
+<span style="{_term_style}">Drawdown</span>
+<span style="{_def_style}">
+How far the portfolio has fallen from its all-time high, expressed as a percentage.
+A drawdown of −20% means the portfolio is currently worth 20% less than it was at
+its peak.
+</span>
+""", unsafe_allow_html=True)
+
+    with right:
+        st.markdown(f"""
+<span style="{_term_style}">Overconfidence Bias</span>
+<span style="{_def_style}">
+Based on Barber &amp; Odean (2001). Investors who believe they can identify winning
+assets trade more, concentrate more, and pay more in transaction costs — all of
+which reduce long-run returns despite feeling productive.
+</span>
+
+<span style="{_term_style}">Bias Cost</span>
+<span style="{_def_style}">
+The dollar difference in median terminal wealth between the Rational investor and
+each behavioral archetype, over the full simulation horizon. It answers: "What did
+acting on instinct actually cost?"
+</span>
+""", unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "Wealth Paths",
